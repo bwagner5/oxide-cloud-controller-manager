@@ -21,10 +21,10 @@ var _ cloudprovider.InstancesV2 = (*InstancesV2)(nil)
 const gibibyte = 1024 * 1024 * 1024
 
 type oxideInstanceClient interface {
-	InstanceNetworkInterfaceList(
+	InstanceNetworkInterfaceListAllPages(
 		context.Context,
 		oxide.InstanceNetworkInterfaceListParams,
-	) (*oxide.InstanceNetworkInterfaceResultsPage, error)
+	) ([]oxide.InstanceNetworkInterface, error)
 	InstanceExternalIpList(
 		context.Context,
 		oxide.InstanceExternalIpListParams,
@@ -73,7 +73,7 @@ func (i *InstancesV2) InstanceMetadata(
 		return nil, err
 	}
 
-	nics, err := i.client.InstanceNetworkInterfaceList(
+	nics, err := i.client.InstanceNetworkInterfaceListAllPages(
 		ctx,
 		oxide.InstanceNetworkInterfaceListParams{
 			Instance: oxide.NameOrId(instance.Id),
@@ -96,7 +96,7 @@ func (i *InstancesV2) InstanceMetadata(
 		Address: instance.Hostname,
 	})
 
-	for _, nic := range nics.Items {
+	for _, nic := range nics {
 		if v4, ok := nic.IpStack.AsV4(); ok {
 			nodeAddresses = append(nodeAddresses, v1.NodeAddress{
 				Type:    v1.NodeInternalIP,

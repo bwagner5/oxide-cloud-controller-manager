@@ -14,8 +14,8 @@ import (
 )
 
 type mockOxideClient struct {
-	InstanceNetworkInterfaceListOutput *oxide.InstanceNetworkInterfaceResultsPage
-	InstanceNetworkInterfaceListError  error
+	InstanceNetworkInterfaceListAllPagesOutput []oxide.InstanceNetworkInterface
+	InstanceNetworkInterfaceListAllPagesError  error
 
 	InstanceExternalIpListOutput *oxide.ExternalIpResultsPage
 	InstanceExternalIpListError  error
@@ -44,14 +44,32 @@ var (
 
 	instanceRunning = oxide.Instance{
 		Name:     oxide.Name("node-1"),
+		Hostname: "node-1",
 		Id:       "12345678-1234-1234-1234-123456789abc",
 		RunState: oxide.InstanceStateRunning,
+		Ncpus:    2,
+		Memory:   1073741824, // 1GiB
 	}
 
 	instanceStopped = oxide.Instance{
 		Name:     oxide.Name("node-1"),
+		Hostname: "node-1",
 		Id:       "12345678-1234-1234-1234-123456789abc",
 		RunState: oxide.InstanceStateStopped,
+		Ncpus:    2,
+		Memory:   1073741824, // 1GiB
+	}
+	ipv4NIC = oxide.InstanceNetworkInterface{
+		IpStack: oxide.PrivateIpStack{
+			Value: &oxide.PrivateIpStackV4{
+				Value: oxide.PrivateIpv4Stack{
+					Ip: "192.168.0.2",
+				},
+			},
+		},
+	}
+	externalEphemeralIPv4 = oxide.ExternalIp{
+		Value: &oxide.ExternalIpEphemeral{Ip: "192.168.0.3"},
 	}
 )
 
@@ -171,14 +189,44 @@ func TestShutdown(t *testing.T) {
 	})
 }
 
-func (c *mockOxideClient) InstanceNetworkInterfaceList(
+func TestInstanceMetadata(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		instanceV2 := InstancesV2{
+			client: &mockOxideClient{
+				InstanceViewOutput:                         &instanceRunning,
+				InstanceNetworkInterfaceListAllPagesOutput: []oxide.InstanceNetworkInterface{ipv4NIC},
+				InstanceExternalIpListOutput: &oxide.ExternalIpResultsPage{
+					Items: []oxide.ExternalIp{
+						externalEphemeralIPv4,
+					},
+				},
+			},
+		}
+
+		metadata, err := instanceV2.InstanceMetadata(t.Context(), &nodeWithoutProviderID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expectedProviderID := "oxide://" + instanceRunning.Id
+		if metadata.ProviderID != expectedProviderID {
+			t.Fatalf("expected provider ID to equal \"%s\" but got \"%s\"", expectedProviderID, metadata.ProviderID)
+		}
+
+		// expects 3 since hostname is included from the instance
+		if len(metadata.NodeAddresses) != 3 {
+			t.Fatalf("expected node addresses to have a len of 3 but got %v", metadata.NodeAddresses)
+		}
+	})
+}
+
+func (c *mockOxideClient) InstanceNetworkInterfaceListAllPages(
 	context.Context,
 	oxide.InstanceNetworkInterfaceListParams,
-) (*oxide.InstanceNetworkInterfaceResultsPage, error) {
-	if c.InstanceNetworkInterfaceListError != nil {
-		return nil, c.InstanceNetworkInterfaceListError
+) ([]oxide.InstanceNetworkInterface, error) {
+	if c.InstanceNetworkInterfaceListAllPagesError != nil {
+		return nil, c.InstanceNetworkInterfaceListAllPagesError
 	}
-	return c.InstanceNetworkInterfaceListOutput, nil
+	return c.InstanceNetworkInterfaceListAllPagesOutput, nil
 }
 
 func (c *mockOxideClient) InstanceExternalIpList(
