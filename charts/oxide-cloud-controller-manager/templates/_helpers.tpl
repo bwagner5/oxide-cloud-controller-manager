@@ -27,4 +27,11 @@ helm.sh/chart: {{ include "oxide-ccm.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- with .Values.additionalLabels }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{- define "oxide-ccm.credentialsSecret" -}}
+{{- default (include "oxide-ccm.fullName" .) .Values.credentialsSecret }}
 {{- end }}

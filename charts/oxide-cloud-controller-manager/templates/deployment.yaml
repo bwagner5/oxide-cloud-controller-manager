@@ -15,9 +15,16 @@ spec:
       labels:
         {{- include "oxide-ccm.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.hostNetwork }}
       dnsPolicy: Default
       hostNetwork: true
+      {{- end }}
+      {{- if .Values.rbac.create }}
       serviceAccountName: {{ include "oxide-ccm.fullName" . }}
+      {{- end }}
+      {{- if .Values.kubeconfig.secretName }}
+      automountServiceAccountToken: false
+      {{- end }}
       priorityClassName: system-cluster-critical
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -38,6 +45,11 @@ spec:
         command:
           - "/usr/bin/oxide-cloud-controller-manager"
           - "--cloud-provider=oxide"
+          {{- if .Values.kubeconfig.secretName }}
+          - --kubeconfig=/etc/ccm/kubeconfig/value
+          - --authentication-kubeconfig=/etc/ccm/kubeconfig/value
+          - --authorization-kubeconfig=/etc/ccm/kubeconfig/value
+          {{- end }}
           {{- range .Values.extraArgs }}
           - {{ . | quote }}
           {{- end }}
@@ -49,15 +61,25 @@ spec:
           - name: OXIDE_HOST
             valueFrom:
               secretKeyRef:
-                name: {{ include "oxide-ccm.fullName" . }}
+                name: {{ include "oxide-ccm.credentialsSecret" . }}
                 key: oxide-host
           - name: OXIDE_TOKEN
             valueFrom:
               secretKeyRef:
-                name: {{ include "oxide-ccm.fullName" . }}
+                name: {{ include "oxide-ccm.credentialsSecret" . }}
                 key: oxide-token
           - name: OXIDE_PROJECT
             valueFrom:
               secretKeyRef:
-                name: {{ include "oxide-ccm.fullName" . }}
+                name: {{ include "oxide-ccm.credentialsSecret" . }}
                 key: oxide-project
+        {{- if .Values.kubeconfig.secretName }}
+        volumeMounts:
+          - name: kubeconfig
+            mountPath: /etc/ccm/kubeconfig
+            readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: {{ .Values.kubeconfig.secretName }}
+        {{- end }}

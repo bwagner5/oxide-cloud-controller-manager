@@ -1,5 +1,21 @@
 replicaCount: 1
 
+# Run on the host network, as a CCM must when it starts before the cluster's CNI.
+hostNetwork: true
+
+rbac:
+  create: true
+
+# A Secret holding a kubeconfig (key `value`) for the cluster to manage, when the CCM runs
+# outside it.
+kubeconfig:
+  secretName: ""
+
+# The Secret with oxide-host, oxide-token and oxide-project. Defaults to the release's name.
+credentialsSecret: ""
+
+additionalLabels: {}
+
 image:
   repository: ghcr.io/oxidecomputer/oxide-cloud-controller-manager
   pullPolicy: IfNotPresent
